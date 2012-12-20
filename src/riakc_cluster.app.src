@@ -1,0 +1,12 @@
+{application, riakc_cluster,
+ [
+  {description, "Riak cluster client"},
+  {vsn, "1.0.0"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { riakc_cluster_app, []}},
+  {env, []}
+ ]}.
