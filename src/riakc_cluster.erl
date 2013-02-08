@@ -111,12 +111,12 @@ get_state(ClusterName) ->
 say_up(Node) ->
     say_up(?MODULE, Node).
 say_up(ClusterName, Node) ->
-    do(ClusterName, {node_mon, Node, up}).
+    ClusterName ! {node_mon, Node, up}.
 
 say_down(Node) ->
     say_down(?MODULE, Node).
 say_down(ClusterName, Node) ->
-    do(ClusterName, {node_mon, Node, down}).
+    ClusterName ! {node_mon, Node, down}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % gen_server callbacks
