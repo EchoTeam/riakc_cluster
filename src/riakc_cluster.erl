@@ -21,6 +21,9 @@
     list_keys/1,
     list_keys/2,
     list_keys/3,
+    list_buckets/0,
+    list_buckets/1,
+    list_buckets/2,
 
     say_up/1,
     say_up/2,
@@ -111,6 +114,13 @@ list_keys(ClusterName, Table) ->
 list_keys(ClusterName, Table, Timeout) ->
     do(ClusterName, {list_keys, {Table, Timeout}}).
 
+list_buckets() ->
+    list_buckets(?MODULE, ?TIMEOUT_INTERNAL).
+list_buckets(ClusterName) ->
+    list_buckets(ClusterName, ?TIMEOUT_INTERNAL).
+list_buckets(ClusterName, Timeout) ->
+    do(ClusterName, {list_buckets, Timeout}).
+
 get_state() ->
     get_state(?MODULE).
 get_state(ClusterName) ->
@@ -176,7 +186,7 @@ terminate(_Reason, #state{up = Up}) ->
     ok.
 
 handle_call({put, {Table, Key, Value, Options}}, From, State) ->
-    riak_operation(State, Table, Key, From,
+    riak_operation(State, From,
         fun(Pid) ->
             W = proplists:get_value(w, Options, 2),
             % TODO: consider removing get from here or make a seprate method without it
@@ -189,7 +199,7 @@ handle_call({put, {Table, Key, Value, Options}}, From, State) ->
         end);
 
 handle_call({get, {Table, Key, Options}}, From, State) ->
-    riak_operation(State, Table, Key, From,
+    riak_operation(State, From,
         fun(Pid) ->
             case riakc_pb_socket:get(Pid, Table, Key,
                     Options, ?TIMEOUT_INTERNAL) of
@@ -201,15 +211,21 @@ handle_call({get, {Table, Key, Options}}, From, State) ->
     {noreply, State};
 
 handle_call({delete, {Table, Key, Options}}, From, State) ->
-    riak_operation(State, Table, Key, From,
+    riak_operation(State, From,
         fun(Pid)  ->
             riakc_pb_socket:delete(Pid, Table, Key, Options, ?TIMEOUT_INTERNAL)
         end);
 
 handle_call({list_keys, {Table, Timeout}}, From, State) ->
-    riak_operation(State, Table, Table, From,
+    riak_operation(State, From,
         fun(Pid) ->
             riakc_pb_socket:list_keys(Pid, Table, Timeout)
+        end);
+
+handle_call({list_buckets, Timeout}, From, State) ->
+    riak_operation(State, From,
+        fun(Pid) ->
+            riakc_pb_socket:list_buckets(Pid, Timeout)
         end);
 
 handle_call(stop, _From, State) ->
@@ -439,8 +455,7 @@ cancel_reset_restart_timer(State, Node) ->
     end,
     {ok, CurTimeout}.
 
-riak_operation(#state{up = Up} = State,
-        _Table, _Key, From, Fun) ->
+riak_operation(#state{up = Up} = State, From, Fun) ->
     UpList = dict:to_list(Up),
     riak_operation_ll(State, From, Fun, UpList),
     {noreply, State}.
