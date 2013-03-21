@@ -171,10 +171,6 @@ init([ClusterName, Peers, Options]) ->
     UpPools   = [{N, Pool} || {up, N, Pool} <- Pools],
     [true = link(P) || {_, P} <- UpPools],
 
-    dict:map(fun(Node, _) ->
-        node_mon:start_link(Node, self(), [{ping_only, true}])
-    end, PeersUsed),
-
     {ok, State#state{up = dict:from_list(UpPools),
         down = dict:from_list(DownPools)}}.
 

@@ -239,7 +239,6 @@ timeouts_test_() ->
 
 setup() ->
     ets:new(test_table, [set, named_table, public]),
-    mock_node_mon(),
     mock_riakc_pb_socket().
 
 cleanup() ->
@@ -275,13 +274,6 @@ pb_start_link(_Host, _Port, _Opts) ->
         end
     end),
     {ok, Pid}.
-
-mock_node_mon() ->
-    meck:new(node_mon),
-    meck:expect(node_mon, start_link,
-        fun(_Node, _Pid, _Opts) ->
-            ok
-        end).
 
 mock_riakc_pb_socket() ->
     meck:new(riakc_pb_socket),
