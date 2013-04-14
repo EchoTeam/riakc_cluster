@@ -250,7 +250,7 @@ handle_info({add, Nodes}, State) ->
     {noreply, add_nodes(State, Nodes)};
 
 handle_info({node_mon, Node, down}, State) ->
-    {noreply, maybe_stop_pool(State, Node, down, false)};
+    {noreply, maybe_stop_pool(State, Node, force, false)};
 
 handle_info({node_mon, Node, up}, State) ->
     maybe_start_pool(State, Node),
@@ -368,9 +368,10 @@ try_restart_pool_later(#state{name = ClusterName} = State, Node) ->
     {Timeout, _} = get_restart_timeout(State, Node),
     timer:send_after(Timeout, ClusterName, {try_start_pool_for, Node}).
 
-maybe_start_pool(#state{name = ClusterName, up = Up} = State, Node) ->
-    case dict:find(Node, Up) of
-        error ->
+maybe_start_pool(#state{name = ClusterName, down = Down} = State, Node) ->
+    case dict:find(Node, Down) of
+        {ok, force} -> nop;
+        {ok, _} ->
             spawn_link(fun() ->
                 Pool = start_pool(State, Node),
                 erlang:send(ClusterName, {add, [Pool]})
@@ -384,7 +385,8 @@ maybe_stop_pool(#state{up = Up} = State, Node, Reason, NeedRestart) ->
             catch poolboy:stop(Pool),
             maybe_restart_pool(State, Node, NeedRestart),
             node_down(State, Node, Reason);
-        _ -> State
+        _ ->
+            node_down(State, Node, Reason)
     end.
 
 maybe_slow_node(#state{counters = Counters} = State, Node) ->

@@ -233,6 +233,20 @@ timeouts_test_() ->
         cleanup()
     end}.
 
+say_down_test() ->
+    setup(),
+
+    {ok, Pid} = riakc_cluster:start_link([{?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}}]),
+    [] = gen_server:call(Pid, get_nodes_down),
+    [{?RIAK_NODE, Pool}] = gen_server:call(Pid, get_nodes_up),
+
+    riakc_cluster:say_down(?RIAK_NODE),
+    [{?RIAK_NODE, force}] = gen_server:call(Pid, get_nodes_down),
+
+    ok = riakc_cluster:stop(),
+
+    cleanup().
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% internals
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
