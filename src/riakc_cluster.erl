@@ -243,12 +243,12 @@ handle_info({node_mon, Node, down}, State) ->
     {noreply, maybe_stop_pool(State, Node, force, false)};
 
 handle_info({node_mon, Node, up}, State) ->
-    maybe_start_pool(State, Node),
+    maybe_start_pool(State, Node, true),
     {noreply, State};
 
 handle_info({try_start_pool_for, Node},
         #state{pool_opts = PoolOptions} = State) ->
-    maybe_start_pool(State, Node),
+    maybe_start_pool(State, Node, false),
     MaxTimeout = proplists:get_value(max_restart_timeout, PoolOptions),
     {CurTimeout, _} = get_restart_timeout(State, Node),
     NewState = change_restart_timeout(State, Node,
@@ -358,9 +358,9 @@ try_restart_pool_later(#state{name = ClusterName} = State, Node) ->
     {Timeout, _} = get_restart_timeout(State, Node),
     timer:send_after(Timeout, ClusterName, {try_start_pool_for, Node}).
 
-maybe_start_pool(#state{name = ClusterName, down = Down} = State, Node) ->
+maybe_start_pool(#state{name = ClusterName, down = Down} = State, Node, IgnoreForceCheck) ->
     case dict:find(Node, Down) of
-        {ok, force} -> nop;
+        {ok, force} when IgnoreForceCheck == false -> nop;
         {ok, _} ->
             spawn_link(fun() ->
                 Pool = start_pool(State, Node),
