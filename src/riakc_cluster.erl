@@ -30,8 +30,8 @@
     say_down/1,
     say_down/2,
 
+    start_link/0,
     start_link/1,
-    start_link/2,
     stop/0,
     stop/1,
     get_state/0,
@@ -54,10 +54,11 @@
 % Public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-start_link(Config) ->
-    start_link(?MODULE, Config).
+start_link() ->
+    start_link(?MODULE).
 
-start_link(ClusterName, Config) ->
+start_link(ClusterName) ->
+    {ok, Config} = application:get_env(riak_clusters),
     Peers = proplists:get_value(peers, Config, []),
     Options = proplists:get_value(options, Config, []),
     gen_server:start_link({local, ClusterName}, ?MODULE,
