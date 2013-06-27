@@ -59,10 +59,14 @@ start_link() ->
 
 start_link(ClusterName) ->
     {ok, Config} = application:get_env(riak_clusters),
-    Peers = proplists:get_value(peers, Config, []),
-    Options = proplists:get_value(options, Config, []),
-    gen_server:start_link({local, ClusterName}, ?MODULE,
-        [ClusterName, Peers, Options], []).
+    ClusterConfig = proplists:get_value(ClusterName, Config),
+    case proplists:get_value(peers, ClusterConfig, []) of
+        [] -> erlang:error(no_peers);
+        Peers ->
+            Options = proplists:get_value(options, ClusterConfig, []),
+            gen_server:start_link({local, ClusterName}, ?MODULE,
+                [ClusterName, Peers, Options], [])
+    end.
 
 stop() ->
     stop(?MODULE).
