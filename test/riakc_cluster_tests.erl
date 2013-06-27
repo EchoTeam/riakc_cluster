@@ -26,7 +26,10 @@
 basic_test() ->
     setup(),
 
-    {ok, Pid} = riakc_cluster:start_link([{?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}}]),
+    Config = [
+        {peers, [{?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}}]}
+    ],
+    {ok, Pid} = riakc_cluster:start_link(Config),
     [] = gen_server:call(Pid, get_nodes_down),
     [{?RIAK_NODE, Pool}] = gen_server:call(Pid, get_nodes_up),
     [_] = gen_fsm:sync_send_all_state_event(Pool, get_avail_workers),
@@ -57,7 +60,10 @@ basic_test() ->
 host_unreachable_test() ->
     setup(),
 
-    {ok, Pid} = riakc_cluster:start_link([{?RIAK_NODE, {"undefined", ?RIAK_PORT}}]),
+    Config = [
+        {peers, [{?RIAK_NODE, {"undefined", ?RIAK_PORT}}]}
+    ],
+    {ok, Pid} = riakc_cluster:start_link(Config),
 
     [] = gen_server:call(Pid, get_nodes_up),
     [{?RIAK_NODE, down}] = gen_server:call(Pid, get_nodes_down),
@@ -71,10 +77,13 @@ host_unreachable_test() ->
 host_unreachable2_test() ->
     setup(),
 
-    {ok, Pid} = riakc_cluster:start_link([
-        {?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}},
-        {undefined,  {"undefined", ?RIAK_PORT}}
-    ]),
+    Config = [
+        {peers, [
+            {?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}},
+            {undefined,  {"undefined", ?RIAK_PORT}}
+        ]}
+    ],
+    {ok, Pid} = riakc_cluster:start_link(Config),
 
     [{?RIAK_NODE, _Pool}] = gen_server:call(Pid, get_nodes_up),
     [{undefined, down}] = gen_server:call(Pid, get_nodes_down),
@@ -92,15 +101,19 @@ host_fail_test_() ->
     {timeout, 15000, fun() ->
         setup(),
 
-        {ok, Pid} = riakc_cluster:start_link([
-            {?RIAK_NODE,   {?RIAK_HOST, ?RIAK_PORT}},
-            {'riak@riak0', {"riak0", ?RIAK_PORT}},
-            {'riak@riak1', {"riak1", ?RIAK_PORT}}
-        ], [
-            {min_reconnect_timeout, 1000},
-            {max_reconnect_timeout, 10000},
-            {concurrency_level, 9}
-        ]),
+        Config = [
+            {peers, [
+                {?RIAK_NODE,   {?RIAK_HOST, ?RIAK_PORT}},
+                {'riak@riak0', {"riak0", ?RIAK_PORT}},
+                {'riak@riak1', {"riak1", ?RIAK_PORT}}
+            ]},
+            {options, [
+                {min_reconnect_timeout, 1000},
+                {max_reconnect_timeout, 10000},
+                {concurrency_level, 9}
+            ]}
+        ],
+        {ok, Pid} = riakc_cluster:start_link(Config),
 
         {error, notfound} = riakc_cluster:get(<<"table1">>, <<"key1">>),
         
@@ -133,15 +146,19 @@ more_fails_test_() ->
     {timeout, 15000, fun() ->
         setup(),
 
-        {ok, Pid} = riakc_cluster:start_link([
-            {?RIAK_NODE,   {?RIAK_HOST, ?RIAK_PORT}},
-            {'riak@riak0', {"riak0", ?RIAK_PORT}},
-            {'riak@riak1', {"riak1", ?RIAK_PORT}}
-        ], [
-            {min_reconnect_timeout, 1000},
-            {max_reconnect_timeout, 10000},
-            {concurrency_level, 9}
-        ]),
+        Config = [
+            {peers, [
+                {?RIAK_NODE,   {?RIAK_HOST, ?RIAK_PORT}},
+                {'riak@riak0', {"riak0", ?RIAK_PORT}},
+                {'riak@riak1', {"riak1", ?RIAK_PORT}}
+            ]},
+            {options, [
+                {min_reconnect_timeout, 1000},
+                {max_reconnect_timeout, 10000},
+                {concurrency_level, 9}
+            ]}
+        ],
+        {ok, Pid} = riakc_cluster:start_link(Config),
 
         {error, notfound} = riakc_cluster:get(<<"table1">>, <<"key1">>),
         
@@ -189,12 +206,16 @@ timeouts_test_() ->
     {timeout, ?TIMEOUT_RATE_PERIOD + 5000, fun() ->
         setup(),
 
-        {ok, Pid} = riakc_cluster:start_link([
-            {?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}}
-        ], [
-            {min_reconnect_timeout, 3000},
-            {max_reconnect_timeout, 10000}
-        ]),
+        Config = [
+            {peers, [
+                {?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}}
+            ]},
+            {options, [
+                {min_reconnect_timeout, 3000},
+                {max_reconnect_timeout, 10000}
+            ]}
+        ],
+        {ok, Pid} = riakc_cluster:start_link(Config),
 
         {error, notfound} = riakc_cluster:get(<<"table1">>, <<"key1">>),
         {error, notfound} = riakc_cluster:get(<<"table1">>, <<"key1">>),
@@ -236,7 +257,10 @@ timeouts_test_() ->
 say_down_test() ->
     setup(),
 
-    {ok, Pid} = riakc_cluster:start_link([{?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}}]),
+    Config = [
+        {peers, [{?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}}]}
+    ],
+    {ok, Pid} = riakc_cluster:start_link(Config),
     [] = gen_server:call(Pid, get_nodes_down),
     [{?RIAK_NODE, Pool}] = gen_server:call(Pid, get_nodes_up),
 

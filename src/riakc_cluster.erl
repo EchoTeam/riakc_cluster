@@ -32,7 +32,6 @@
 
     start_link/1,
     start_link/2,
-    start_link/3,
     stop/0,
     stop/1,
     get_state/0,
@@ -55,21 +54,12 @@
 % Public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-start_link(ClusterName) when is_atom(ClusterName) ->
-    {ok, Config} = application:get_env(riak_clusters),
-    ClusterConfig = proplists:get_value(ClusterName, Config, []),
-    Peers = proplists:get_value(peers, ClusterConfig, []),
-    Options = proplists:get_value(options, ClusterConfig, []),
-    gen_server:start_link({local, ClusterName}, ?MODULE,
-        [ClusterName, Peers, Options], []);
+start_link(Config) ->
+    start_link(?MODULE, Config).
 
-start_link(Peers) ->
-    start_link(?MODULE, Peers, []).
-start_link(Peers, Options) when is_list(Peers) ->
-    start_link(?MODULE, Peers, Options);
-start_link(ClusterName, Peers) -> 
-    start_link(ClusterName, Peers, []).
-start_link(ClusterName, Peers, Options) -> 
+start_link(ClusterName, Config) ->
+    Peers = proplists:get_value(peers, Config, []),
+    Options = proplists:get_value(options, Config, []),
     gen_server:start_link({local, ClusterName}, ?MODULE,
         [ClusterName, Peers, Options], []).
 
