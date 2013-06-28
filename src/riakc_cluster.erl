@@ -32,6 +32,7 @@
 
     start_link/0,
     start_link/1,
+    start_link/2,
     stop/0,
     stop/1,
     get_state/0,
@@ -58,7 +59,10 @@ start_link() ->
     start_link(?MODULE).
 
 start_link(ClusterName) ->
-    {ok, Config} = application:get_env(riak_clusters),
+    start_link(ClusterName, riak_clusters).
+
+start_link(ClusterName, ConfigKey) ->
+    {ok, Config} = application:get_env(ConfigKey),
     ClusterConfig = proplists:get_value(ClusterName, Config),
     case proplists:get_value(peers, ClusterConfig, []) of
         [] -> erlang:error(no_peers);

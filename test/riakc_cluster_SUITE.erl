@@ -296,7 +296,7 @@ pb_start_link(_Host, _Port, _Opts) ->
 mock_application(Config) ->
     meck:new(application, [unstick]),
     meck:expect(application, get_env, fun(riak_clusters) ->
-        {ok, Config}
+        {ok, [{riakc_cluster, Config}]}
     end).
 
 mock_riakc_pb_socket() ->
