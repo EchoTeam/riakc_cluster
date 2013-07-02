@@ -46,10 +46,10 @@ end_per_testcase(_, Config) ->
     Config.
 
 basic_test(_) ->
-    mock_application([
+    Config = [
         {peers, [{?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}}]}
-    ]),
-    {ok, Pid} = riakc_cluster:start_link(),
+    ],
+    {ok, Pid} = riakc_cluster:start_link(Config),
     [] = gen_server:call(Pid, get_nodes_down),
     [{?RIAK_NODE, Pool}] = gen_server:call(Pid, get_nodes_up),
     [_] = gen_fsm:sync_send_all_state_event(Pool, get_avail_workers),
@@ -76,10 +76,10 @@ basic_test(_) ->
     ok = riakc_cluster:stop().
 
 host_unreachable_test(_) ->
-    mock_application([
+    Config = [
         {peers, [{?RIAK_NODE, {"undefined", ?RIAK_PORT}}]}
-    ]),
-    {ok, Pid} = riakc_cluster:start_link(),
+    ],
+    {ok, Pid} = riakc_cluster:start_link(Config),
 
     [] = gen_server:call(Pid, get_nodes_up),
     [{?RIAK_NODE, down}] = gen_server:call(Pid, get_nodes_down),
@@ -89,13 +89,13 @@ host_unreachable_test(_) ->
     ok = riakc_cluster:stop().
 
 host_unreachable2_test(_) ->
-    mock_application([
+    Config = [
         {peers, [
             {?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}},
             {undefined,  {"undefined", ?RIAK_PORT}}
         ]}
-    ]),
-    {ok, Pid} = riakc_cluster:start_link(),
+    ],
+    {ok, Pid} = riakc_cluster:start_link(Config),
 
     [{?RIAK_NODE, _Pool}] = gen_server:call(Pid, get_nodes_up),
     [{undefined, down}] = gen_server:call(Pid, get_nodes_down),
@@ -108,7 +108,7 @@ host_unreachable2_test(_) ->
     ok = riakc_cluster:stop().
 
 host_fail_test(_) ->
-    mock_application([
+    Config = [
         {peers, [
             {?RIAK_NODE,   {?RIAK_HOST, ?RIAK_PORT}},
             {'riak@riak0', {"riak0", ?RIAK_PORT}},
@@ -119,8 +119,8 @@ host_fail_test(_) ->
             {max_reconnect_timeout, 10000},
             {concurrency_level, 9}
         ]}
-    ]),
-    {ok, Pid} = riakc_cluster:start_link(),
+    ],
+    {ok, Pid} = riakc_cluster:start_link(Config),
 
     {error, notfound} = riakc_cluster:get(<<"table1">>, <<"key1">>),
     
@@ -147,7 +147,7 @@ host_fail_test(_) ->
     ok = riakc_cluster:stop().
 
 more_fails_test(_) ->
-    mock_application([
+    Config = [
         {peers, [
             {?RIAK_NODE,   {?RIAK_HOST, ?RIAK_PORT}},
             {'riak@riak0', {"riak0", ?RIAK_PORT}},
@@ -158,8 +158,8 @@ more_fails_test(_) ->
             {max_reconnect_timeout, 10000},
             {concurrency_level, 9}
         ]}
-    ]),
-    {ok, Pid} = riakc_cluster:start_link(),
+    ],
+    {ok, Pid} = riakc_cluster:start_link(Config),
 
     {error, notfound} = riakc_cluster:get(<<"table1">>, <<"key1">>),
     
@@ -201,7 +201,7 @@ more_fails_test(_) ->
     ok = riakc_cluster:stop().
 
 timeouts_test(_) ->
-    mock_application([
+    Config = [
         {peers, [
             {?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}}
         ]},
@@ -209,8 +209,8 @@ timeouts_test(_) ->
             {min_reconnect_timeout, 3000},
             {max_reconnect_timeout, 10000}
         ]}
-    ]),
-    {ok, Pid} = riakc_cluster:start_link(),
+    ],
+    {ok, Pid} = riakc_cluster:start_link(Config),
 
     {error, notfound} = riakc_cluster:get(<<"table1">>, <<"key1">>),
     {error, notfound} = riakc_cluster:get(<<"table1">>, <<"key1">>),
@@ -247,10 +247,10 @@ timeouts_test(_) ->
     ok = riakc_cluster:stop().
 
 say_down_test(_) ->
-    mock_application([
+    Config = [
         {peers, [{?RIAK_NODE, {?RIAK_HOST, ?RIAK_PORT}}]}
-    ]),
-    {ok, Pid} = riakc_cluster:start_link(),
+    ],
+    {ok, Pid} = riakc_cluster:start_link(Config),
     [] = gen_server:call(Pid, get_nodes_down),
     [{?RIAK_NODE, Pool}] = gen_server:call(Pid, get_nodes_up),
 
@@ -292,12 +292,6 @@ pb_start_link(_Host, _Port, _Opts) ->
         end
     end),
     {ok, Pid}.
-
-mock_application(Config) ->
-    meck:new(application, [unstick]),
-    meck:expect(application, get_env, fun(riak_clusters) ->
-        {ok, [{riakc_cluster, Config}]}
-    end).
 
 mock_riakc_pb_socket() ->
     meck:new(riakc_pb_socket),

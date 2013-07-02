@@ -30,7 +30,6 @@
     say_down/1,
     say_down/2,
 
-    start_link/0,
     start_link/1,
     start_link/2,
     stop/0,
@@ -55,19 +54,14 @@
 % Public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-start_link() ->
-    start_link(?MODULE).
+start_link(Config) ->
+    start_link(?MODULE, Config).
 
-start_link(ClusterName) ->
-    start_link(ClusterName, riak_clusters).
-
-start_link(ClusterName, ConfigKey) ->
-    {ok, Config} = application:get_env(ConfigKey),
-    ClusterConfig = proplists:get_value(ClusterName, Config),
-    case proplists:get_value(peers, ClusterConfig, []) of
+start_link(ClusterName, Config) ->
+    case proplists:get_value(peers, Config, []) of
         [] -> erlang:error(no_peers);
         Peers ->
-            Options = proplists:get_value(options, ClusterConfig, []),
+            Options = proplists:get_value(options, Config, []),
             gen_server:start_link({local, ClusterName}, ?MODULE,
                 [ClusterName, Peers, Options], [])
     end.
