@@ -32,7 +32,6 @@
 
     start_link/1,
     start_link/2,
-    start_link/3,
     stop/0,
     stop/1,
     get_state/0,
@@ -55,23 +54,17 @@
 % Public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-start_link(ClusterName) when is_atom(ClusterName) ->
-    {ok, Config} = application:get_env(riak_clusters),
-    ClusterConfig = proplists:get_value(ClusterName, Config, []),
-    Peers = proplists:get_value(peers, ClusterConfig, []),
-    Options = proplists:get_value(options, ClusterConfig, []),
-    gen_server:start_link({local, ClusterName}, ?MODULE,
-        [ClusterName, Peers, Options], []);
+start_link(Config) ->
+    start_link(?MODULE, Config).
 
-start_link(Peers) ->
-    start_link(?MODULE, Peers, []).
-start_link(Peers, Options) when is_list(Peers) ->
-    start_link(?MODULE, Peers, Options);
-start_link(ClusterName, Peers) -> 
-    start_link(ClusterName, Peers, []).
-start_link(ClusterName, Peers, Options) -> 
-    gen_server:start_link({local, ClusterName}, ?MODULE,
-        [ClusterName, Peers, Options], []).
+start_link(ClusterName, Config) ->
+    case proplists:get_value(peers, Config, []) of
+        [] -> erlang:error(no_peers);
+        Peers ->
+            Options = proplists:get_value(options, Config, []),
+            gen_server:start_link({local, ClusterName}, ?MODULE,
+                [ClusterName, Peers, Options], [])
+    end.
 
 stop() ->
     stop(?MODULE).
@@ -253,12 +246,12 @@ handle_info({node_mon, Node, down}, State) ->
     {noreply, maybe_stop_pool(State, Node, force, false)};
 
 handle_info({node_mon, Node, up}, State) ->
-    maybe_start_pool(State, Node),
+    maybe_start_pool(State, Node, true),
     {noreply, State};
 
 handle_info({try_start_pool_for, Node},
         #state{pool_opts = PoolOptions} = State) ->
-    maybe_start_pool(State, Node),
+    maybe_start_pool(State, Node, false),
     MaxTimeout = proplists:get_value(max_restart_timeout, PoolOptions),
     {CurTimeout, _} = get_restart_timeout(State, Node),
     NewState = change_restart_timeout(State, Node,
@@ -368,9 +361,9 @@ try_restart_pool_later(#state{name = ClusterName} = State, Node) ->
     {Timeout, _} = get_restart_timeout(State, Node),
     timer:send_after(Timeout, ClusterName, {try_start_pool_for, Node}).
 
-maybe_start_pool(#state{name = ClusterName, down = Down} = State, Node) ->
+maybe_start_pool(#state{name = ClusterName, down = Down} = State, Node, IgnoreForceCheck) ->
     case dict:find(Node, Down) of
-        {ok, force} -> nop;
+        {ok, force} when IgnoreForceCheck == false -> nop;
         {ok, _} ->
             spawn_link(fun() ->
                 Pool = start_pool(State, Node),
