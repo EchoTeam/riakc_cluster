@@ -13,10 +13,11 @@ start_link(Args) ->
     Host = proplists:get_value(host, Args),
     Port = proplists:get_value(port, Args),
     DefaultOptions = [
-        {auto_reconnect, false}
+        {auto_reconnect, true}
     ],
     Options = proplists:get_value(options, Args, []),
     NewOptions = lists:foldl(fun({K, V}, Acc) ->
         lists:keystore(K, 1, Acc, {K, proplists:get_value(K, Acc, V)})
     end, Options, DefaultOptions),
+    io:format("~p~n", [NewOptions]),
     riakc_pb_socket:start_link(Host, Port, NewOptions).
