@@ -32,11 +32,11 @@ no_nodes_test_() ->
     }.
 
 test_no_nodes() ->
-    Nodes = [Node || {Node, _} <- gen_server:call(?CNAME, get_nodes_up)],
+    Nodes = get_nodes(up),
     ?assertEqual(true, length(Nodes) > 0),
     [riakc_cluster:say_down(?CNAME, Node) || Node <- Nodes],
     timer:sleep(100),
-    ?assertEqual([], gen_server:call(?CNAME, get_nodes_up)),
+    ?assertEqual([], get_nodes(up)),
     ?assertEqual({error, no_available_nodes}, riakc_cluster:get(?CNAME, <<"table">>, <<"key">>)).
 
 get_test_() ->
@@ -140,5 +140,37 @@ server_timeout_setup() ->
 test_server_timeout() ->
     ?assertEqual({error, timeout_external}, riakc_cluster:get(?CNAME, <<"table">>, undefined, [])).
 
+down_nodes_test_() ->
+    {setup,
+        fun down_nodes_setup/0,
+        fun cluster_cleanup/1,
+        [fun test_down_nodes/0]
+    }.
+
+down_nodes_setup() ->
+    meck:new(poolboy),
+    meck:expect(poolboy, start, fun(_PoolArgs, WorkerArgs) ->
+        case proplists:get_value(port, WorkerArgs) of
+            1 ->
+                Pid = spawn_link(fun() ->
+                    receive undefined -> ok end
+                end),
+                {ok, Pid};
+            2 ->
+                {error, somererror}
+        end
+    end),
+    Peers = [{node1, {"localhost", 1}}, {node2, {"localhost", 2}}],
+    {ok, _Pid} = riakc_cluster:start_link(?CNAME, [{peers, Peers}]),
+    ok.
+
+test_down_nodes() ->
+    ?assertEqual([node1], get_nodes(up)),
+    ?assertEqual([node2], get_nodes(down)).
+
+% private functions
+
+get_nodes(Type) when Type =:= up; Type =:= down ->
+    [Node || {Node, _} <- gen_server:call(?CNAME, list_to_atom("get_nodes_" ++ atom_to_list(Type)))].
 
 -endif.

@@ -118,7 +118,7 @@ list_keys(ClusterName, Table) ->
 list_keys(ClusterName, Table, Timeout) ->
     do(ClusterName, {list_keys, {Table, Timeout}}).
 
--spec list_keys(ClusterName :: cluster_name(), Timeout :: timeout()) -> error() | {'ok', [table()]}.
+-spec list_buckets(ClusterName :: cluster_name(), Timeout :: timeout()) -> error() | {'ok', [table()]}.
 list_buckets() ->
     list_buckets(?MODULE, ?TIMEOUT_INTERNAL).
 list_buckets(ClusterName) ->
@@ -343,6 +343,7 @@ do(ClusterName, Request) ->
             {error, timeout_external}
     end.
 
+-spec start_pools(State :: #state{}) -> [{'up', node(), pid()} | {'down', node()}].
 start_pools(#state{peers = Peers} = State) ->
     PeersList = dict:to_list(Peers),
     [start_pool(State, {Node, Host, Port})
