@@ -50,6 +50,13 @@
 
 -include("riakc_cluster.hrl").
 
+-type error() :: {'error', 'timeout' | 'disconnected' | 'notfound' | 'timeout_external' | 'no_available_nodes' | term()}.
+-type cluster_name() :: atom().
+-type table() :: binary().
+-type key() :: binary().
+-type value() :: term().
+-type options() :: [proplists:property()].
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -71,6 +78,7 @@ stop() ->
 stop(ClusterName) ->
     do(ClusterName, stop).
 
+-spec put(ClusterName :: cluster_name(), Table :: table(), Key :: key(), Value :: value(), Options :: options()) -> error() | 'ok'.
 put(Table, Key, Value) ->
     put(?MODULE, Table, Key, Value, []).
 put(Table, Key, Value, Options) when is_binary(Table) ->
@@ -80,6 +88,7 @@ put(ClusterName, Table, Key, Value) ->
 put(ClusterName, Table, Key, Value, Options) ->
     do(ClusterName, {put, {Table, Key, Value, Options}}).
 
+-spec get(ClusterName :: cluster_name(), Table :: table(), Key :: key(), Options :: options()) -> error() | {'ok', value()}.
 get(Table, Key) ->
     get(?MODULE, Table, Key, []).
 get(Table, Key, Options) when is_binary(Table) ->
@@ -89,6 +98,7 @@ get(ClusterName, Table, Key) ->
 get(ClusterName, Table, Key, Options) ->
     do(ClusterName, {get, {Table, Key, Options}}).  
 
+-spec delete(ClusterName :: cluster_name(), Table :: table(), Key :: key(), Options :: options()) -> error() | 'ok'.
 delete(Table, Key) ->
     delete(?MODULE, Table, Key, []).
 delete(Table, Key, Options) when is_binary(Table) ->
@@ -98,6 +108,7 @@ delete(ClusterName, Table, Key) ->
 delete(ClusterName, Table, Key, Options) ->
     do(ClusterName, {delete, {Table, Key, Options}}).  
 
+-spec list_keys(ClusterName :: cluster_name(), Table :: table(), Timeout :: timeout()) -> error() | {'ok', [key()]}.
 list_keys(Table) ->
     list_keys(?MODULE, Table, ?TIMEOUT_INTERNAL).
 list_keys(Table, Timeout) when is_binary(Table) ->
@@ -107,6 +118,7 @@ list_keys(ClusterName, Table) ->
 list_keys(ClusterName, Table, Timeout) ->
     do(ClusterName, {list_keys, {Table, Timeout}}).
 
+-spec list_keys(ClusterName :: cluster_name(), Timeout :: timeout()) -> error() | {'ok', [table()]}.
 list_buckets() ->
     list_buckets(?MODULE, ?TIMEOUT_INTERNAL).
 list_buckets(ClusterName) ->
@@ -114,16 +126,19 @@ list_buckets(ClusterName) ->
 list_buckets(ClusterName, Timeout) ->
     do(ClusterName, {list_buckets, Timeout}).
 
+-spec get_state(ClusterName :: cluster_name()) -> #state{}.
 get_state() ->
     get_state(?MODULE).
 get_state(ClusterName) ->
     do(ClusterName, get_state).
 
+-spec say_up(ClusterName :: cluster_name(), Node :: node()) -> term().
 say_up(Node) ->
     say_up(?MODULE, Node).
 say_up(ClusterName, Node) ->
     ClusterName ! {node_mon, Node, up}.
 
+-spec say_down(ClusterName :: cluster_name(), Node :: node()) -> term().
 say_down(Node) ->
     say_down(?MODULE, Node).
 say_down(ClusterName, Node) ->
@@ -152,7 +167,6 @@ init([ClusterName, Peers, Options]) ->
         {max_restart_timeout, MaxReconnectTimeout},
         {worker_module, riakc_pb_worker}
     ],
-
     PeersUsed = dict:from_list(lists:sublist(shuffle_list(Peers),
         PoolsNumber)),
 
@@ -183,7 +197,9 @@ handle_call({put, {Table, Key, Value, Options}}, From, State) ->
                 {ok, Obj} ->
                     riakc_pb_socket:put(Pid, riakc_obj:update_value(Obj, term_to_binary(Value), <<"application/x-erlang-term">>), Options, ?TIMEOUT_INTERNAL);
                 {error, notfound} ->
-                    riakc_pb_socket:put(Pid, riakc_obj:new(Table, Key, term_to_binary(Value), <<"application/x-erlang-term">>), Options, ?TIMEOUT_INTERNAL)
+                    riakc_pb_socket:put(Pid, riakc_obj:new(Table, Key, term_to_binary(Value), <<"application/x-erlang-term">>), Options, ?TIMEOUT_INTERNAL);
+                {error, _Reason} = Error ->
+                    Error
             end
         end);
 
@@ -194,10 +210,10 @@ handle_call({get, {Table, Key, Options}}, From, State) ->
                     Options, ?TIMEOUT_INTERNAL) of
                 {ok, Obj} ->
                     {ok, binary_to_term(riakc_obj:get_value(Obj))};
-                Error -> Error
+                {error, _Reason} = Error ->
+                    Error
             end
-        end),
-    {noreply, State};
+        end);
 
 handle_call({delete, {Table, Key, Options}}, From, State) ->
     riak_operation(State, From,
@@ -320,7 +336,12 @@ with_random(Alternatives, Fun) ->
     Fun(Element).
 
 do(ClusterName, Request) ->
-    gen_server:call(ClusterName, Request, ?TIMEOUT_EXTERNAL).
+    try
+        gen_server:call(ClusterName, Request, ?TIMEOUT_EXTERNAL)
+    catch
+        exit:{timeout, {gen_server, call, _}} ->
+            {error, timeout_external}
+    end.
 
 start_pools(#state{peers = Peers} = State) ->
     PeersList = dict:to_list(Peers),
@@ -457,15 +478,24 @@ riak_operation_ll(State, From, Fun, Nodes) ->
     spawn(fun() ->
         {Node, Reply} = with_random(Nodes,
             fun({Node, Pool}) ->
-                poolboy:transaction(Pool, fun(Worker) ->
-                    {Node, Fun(Worker)}
-                end)
+                try
+                    poolboy:transaction(Pool, fun(Worker) ->
+                        {Node, Fun(Worker)}
+                    end)
+                catch
+                    error:Reason ->
+                        {Node, {error, Reason}};
+                    Class:Reason ->
+                        {Node, {error, {Class, Reason}}}
+                end
             end),
         gen_server:reply(From, Reply),
-        bump_counters(State, Node, Reply)
+        bump_counters(whereis(State#state.name), Node, Reply)
     end).
 
-bump_counters(State, Node, {error, timeout} = _Reply) ->
-    whereis(State#state.name) ! {bump_timeout_counter, Node};
-bump_counters(State, Node, _) ->
-    whereis(State#state.name) ! {bump_success_counter, Node}.
+bump_counters(undefined, _Node, _Reply) ->
+    nop;
+bump_counters(Pid, Node, {error, Reason} = _Reply) when Reason =:= timeout; Reason =:= disconnected ->
+    Pid ! {bump_timeout_counter, Node};
+bump_counters(Pid, Node, _Reply) ->
+    Pid ! {bump_success_counter, Node}.
