@@ -330,12 +330,7 @@ with_random(Alternatives, Fun) ->
     Fun(Element).
 
 do(ClusterName, Request) ->
-    try
-        gen_server:call(ClusterName, Request, ?TIMEOUT_EXTERNAL)
-    catch
-        exit:{timeout, {gen_server, call, _}} ->
-            {error, timeout_external}
-    end.
+    gen_server:call(ClusterName, Request, ?TIMEOUT_EXTERNAL).
 
 -spec start_pools(State :: #state{}) -> [{'up', node(), pid()} | {'down', node()}].
 start_pools(#state{peers = Peers} = State) ->
@@ -473,16 +468,9 @@ riak_operation_ll(State, From, Fun, Nodes) ->
     spawn(fun() ->
         {Node, Reply} = with_random(Nodes,
             fun({Node, Pool}) ->
-                try
-                    poolboy:transaction(Pool, fun(Worker) ->
-                        {Node, Fun(Worker)}
-                    end)
-                catch
-                    error:Reason ->
-                        {Node, {error, Reason}};
-                    Class:Reason ->
-                        {Node, {error, {Class, Reason}}}
-                end
+                poolboy:transaction(Pool, fun(Worker) ->
+                    {Node, Fun(Worker)}
+                end)
             end),
         gen_server:reply(From, Reply),
         bump_counters(whereis(State#state.name), Node, Reply)

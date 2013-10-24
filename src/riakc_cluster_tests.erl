@@ -45,7 +45,7 @@ get_test_() ->
         fun cluster_cleanup/1,
         test_get_generator()
     }.
-   
+
 get_setup() ->
     cluster_setup(),
 
@@ -116,12 +116,26 @@ test_put_generator() ->
 
 server_exception_test_() ->
     {setup,
-        fun get_setup/0,
+        fun server_exception_setup/0,
         fun cluster_cleanup/1,
-        [fun() ->
-            ?assertEqual({error, {case_clause, undefined}}, riakc_cluster:get(?CNAME, <<"table">>, undefined, []))
-        end]
+        [{timeout, ?TIMEOUT_EXTERNAL + 1000, fun test_server_exception/0}]
     }.
+
+server_exception_setup() ->
+    cluster_setup(),
+
+    meck:new(riakc_pb_socket),
+    meck:expect(riakc_pb_socket, get, fun(_Pid, _Bucket, _Key, _Options, _Timeout) ->
+        erlang:error(someerror)
+    end),
+    meck:new(riakc_obj),
+    meck:expect(riakc_obj, get_value, fun(Value) ->
+        Value
+    end).
+
+test_server_exception() ->
+    ?assertMatch({exit, {timeout, {gen_server, call, _}}},
+                    try riakc_cluster:get(?CNAME, <<"table">>, undefined, []) catch C:R -> {C, R} end).
 
 server_timeout_test_() ->
     {setup,
@@ -138,7 +152,8 @@ server_timeout_setup() ->
     end).
 
 test_server_timeout() ->
-    ?assertEqual({error, timeout_external}, riakc_cluster:get(?CNAME, <<"table">>, undefined, [])).
+    ?assertMatch({exit, {timeout, {gen_server, call, _}}},
+                    try riakc_cluster:get(?CNAME, <<"table">>, undefined, []) catch C:R -> {C, R} end).
 
 down_nodes_test_() ->
     {setup,
