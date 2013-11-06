@@ -47,9 +47,25 @@
     init/1,
     terminate/2
 ]).
+-export_type([
+    errors/0,
+    error/0,
+    cluster_name/0,
+    table/0,
+    key/0,
+    value/0,
+    options/0
+]).
 
 -include("riakc_cluster.hrl").
--include("riakc_cluster_types.hrl").
+
+-type errors() :: 'timeout' | 'disconnected' | 'no_available_nodes' | term().
+-type error() :: {'error', 'notfound' | errors()}.
+-type cluster_name() :: atom().
+-type table() :: binary().
+-type key() :: binary().
+-type value() :: term().
+-type options() :: [proplists:property()].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public API
