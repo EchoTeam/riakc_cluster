@@ -1,7 +1,3 @@
-%%% 
-%%% Copyright (c) 2012 JackNyfe. All rights reserved.
-%%% THIS SOFTWARE IS PROPRIETARY AND CONFIDENTIAL. DO NOT REDISTRIBUTE.
-%%% 
 %%% vim: set ts=4 sts=4 sw=4 et:
 
 -module(riakc_cluster).
